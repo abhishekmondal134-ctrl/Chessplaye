@@ -7,14 +7,14 @@
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/chessboard-js/1.0.0/chessboard-1.0.0.min.css">
 <style>
 body { font-family: Arial, sans-serif; background: #302e2b; color: white; text-align: center; margin: 0; padding: 20px; }
-h1 { color: #81b64c; }
+h1 { color: #81b64c; margin-bottom: 5px; }
 #board { width: 400px; margin: 20px auto; max-width: 90vw; }
 .panel { background: #262421; padding: 15px; border-radius: 10px; max-width: 500px; margin: 15px auto; }
 button { background: #81b64c; color: white; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer; font-weight: bold; margin: 5px; }
 button:hover { background: #769c42; }
 input { padding: 10px; border-radius: 5px; border: none; width: 180px; }
 #status { font-size: 18px; font-weight: bold; margin: 10px; color: #ffc107; }
-#myId { font-size: 12px; color: #aaa; word-break: break-all;}
+#myId { font-size: 14px; color: #fff; background: #000; padding: 8px; border-radius: 5px; word-break: break-all;}
 </style>
 </head>
 <body>
@@ -30,7 +30,7 @@ input { padding: 10px; border-radius: 5px; border: none; width: 180px; }
   <hr>
   <input type="text" id="joinId" placeholder="Paste Friend's Code">
   <button onclick="joinGame()">Join Friend</button>
-  <p style="font-size:13px; color:#ccc;">Share your Room Code with a friend anywhere in the world. One creates, one joins.</p>
+  <p style="font-size:13px; color:#ccc;">Share your Room Code with a friend. One creates, one joins.</p>
 </div>
 
 <div class="panel">
@@ -80,9 +80,7 @@ function onDragStart (source, piece, position, orientation) {
 function onDrop (source, target) {
   var move = game.move({ from: source, to: target, promotion: 'q' });
   if (move === null) return 'snapback';
-  
   updateStatus();
-  // Send move to opponent if online
   if (conn && conn.open) {
     conn.send({ type: 'move', from: source, to: target });
   }
@@ -92,17 +90,18 @@ function onSnapEnd () {
   board.position(game.fen());
 }
 
-// Setup Board
+// FIXED BOARD WITH PIECES - This is the fix
 board = Chessboard('board', {
   draggable: true,
   position: 'start',
+  pieceTheme: 'https://chessboardjs.com/img/chesspieces/wikipedia/{piece}.png',
   onDragStart: onDragStart,
   onDrop: onDrop,
   onSnapEnd: onSnapEnd
 });
 updateStatus();
 
-// --- ONLINE MULTIPLAYER WITH PEERJS ---
+// ONLINE MULTIPLAYER WITH PEERJS
 peer = new Peer(Math.random().toString(36).substring(2, 8));
 
 peer.on('open', function(id) {
@@ -113,7 +112,7 @@ peer.on('open', function(id) {
 peer.on('connection', function(c) {
   conn = c;
   isOnlineGame = true;
-  myColor = 'w'; // Host is White
+  myColor = 'w';
   setupConnection();
   alert('Opponent joined! You are White.');
 });
@@ -122,7 +121,7 @@ function joinGame(){
   var id = document.getElementById('joinId').value.trim();
   if(!id) return alert('Paste Room Code first');
   conn = peer.connect(id);
-  myColor = 'b'; // Joiner is Black
+  myColor = 'b';
   isOnlineGame = true;
   setupConnection();
 }
