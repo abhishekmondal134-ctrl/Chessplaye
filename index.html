@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Chess Online - Play Worldwide</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/chessboard-js/1.0.0/chessboard-1.0.0.min.css">
+<style>
+body { font-family: Arial, sans-serif; background: #302e2b; color: white; text-align: center; margin: 0; padding: 20px; }
+h1 { color: #81b64c; }
+#board { width: 400px; margin: 20px auto; max-width: 90vw; }
+.panel { background: #262421; padding: 15px; border-radius: 10px; max-width: 500px; margin: 15px auto; }
+button { background: #81b64c; color: white; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer; font-weight: bold; margin: 5px; }
+button:hover { background: #769c42; }
+input { padding: 10px; border-radius: 5px; border: none; width: 180px; }
+#status { font-size: 18px; font-weight: bold; margin: 10px; color: #ffc107; }
+#myId { font-size: 12px; color: #aaa; word-break: break-all;}
+</style>
+</head>
+<body>
+
+<h1>♔ Chess Online</h1>
+<div id="status">Connecting...</div>
+<div id="board"></div>
+
+<div class="panel">
+  <p><b>Play Online Worldwide:</b></p>
+  <p id="myId">Your Room Code: Loading...</p>
+  <button onclick="copyId()">Copy Room Code</button>
+  <hr>
+  <input type="text" id="joinId" placeholder="Paste Friend's Code">
+  <button onclick="joinGame()">Join Friend</button>
+  <p style="font-size:13px; color:#ccc;">Share your Room Code with a friend anywhere in the world. One creates, one joins.</p>
+</div>
+
+<div class="panel">
+  <button onclick="resetGame()">New Game</button>
+  <button onclick="flipBoard()">Flip Board</button>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.7.1/jquery.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/chess.js/0.10.3/chess.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/chessboard-js/1.0.0/chessboard-1.0.0.min.js"></script>
+<script src="https://unpkg.com/peerjs@1.5.3/dist/peerjs.min.js"></script>
+
+<script>
+var board = null;
+var game = new Chess();
+var peer = null;
+var conn = null;
+var myColor = 'w';
+var isOnlineGame = false;
+
+function updateStatus() {
+  var status = '';
+  var moveColor = game.turn() === 'w' ? 'White' : 'Black';
+  if (game.in_checkmate()) {
+    status = 'Game Over - ' + moveColor + ' is Checkmated!';
+  } else if (game.in_draw()) {
+    status = 'Game Over - Draw!';
+  } else {
+    status = moveColor + ' to move';
+    if (game.in_check()) status += ' (In Check!)';
+  }
+  if(isOnlineGame){
+    status += ' | You are ' + (myColor === 'w' ? 'White' : 'Black');
+  }
+  document.getElementById('status').innerText = status;
+}
+
+function onDragStart (source, piece, position, orientation) {
+  if (game.game_over()) return false;
+  if(isOnlineGame && game.turn() !== myColor) return false;
+  if ((game.turn() === 'w' && piece.search(/^b/) !== -1) ||
+      (game.turn() === 'b' && piece.search(/^w/) !== -1)) {
+      return false;
+  }
+}
+
+function onDrop (source, target) {
+  var move = game.move({ from: source, to: target, promotion: 'q' });
+  if (move === null) return 'snapback';
+  
+  updateStatus();
+  // Send move to opponent if online
+  if (conn && conn.open) {
+    conn.send({ type: 'move', from: source, to: target });
+  }
+}
+
+function onSnapEnd () {
+  board.position(game.fen());
+}
+
+// Setup Board
+board = Chessboard('board', {
+  draggable: true,
+  position: 'start',
+  onDragStart: onDragStart,
+  onDrop: onDrop,
+  onSnapEnd: onSnapEnd
+});
+updateStatus();
+
+// --- ONLINE MULTIPLAYER WITH PEERJS ---
+peer = new Peer(Math.random().toString(36).substring(2, 8));
+
+peer.on('open', function(id) {
+  document.getElementById('myId').innerText = 'Your Room Code: ' + id;
+  document.getElementById('status').innerText = 'Share your code to play worldwide!';
+});
+
+peer.on('connection', function(c) {
+  conn = c;
+  isOnlineGame = true;
+  myColor = 'w'; // Host is White
+  setupConnection();
+  alert('Opponent joined! You are White.');
+});
+
+function joinGame(){
+  var id = document.getElementById('joinId').value.trim();
+  if(!id) return alert('Paste Room Code first');
+  conn = peer.connect(id);
+  myColor = 'b'; // Joiner is Black
+  isOnlineGame = true;
+  setupConnection();
+}
+
+function setupConnection(){
+  conn.on('open', function() {
+    board.orientation(myColor === 'w' ? 'white' : 'black');
+    updateStatus();
+  });
+  conn.on('data', function(data) {
+    if(data.type === 'move'){
+      game.move({ from: data.from, to: data.to, promotion: 'q' });
+      board.position(game.fen());
+      updateStatus();
+    }
+    if(data.type === 'reset'){
+      game.reset();
+      board.start();
+      updateStatus();
+    }
+  });
+}
+
+function copyId(){
+  var text = document.getElementById('myId').innerText.replace('Your Room Code: ','');
+  navigator.clipboard.writeText(text);
+  alert('Copied: ' + text);
+}
+
+function resetGame(){
+  game.reset();
+  board.start();
+  updateStatus();
+  if(conn && conn.open) conn.send({type: 'reset'});
+}
+
+function flipBoard(){
+  board.flip();
+}
+</script>
+</body>
+</html>
